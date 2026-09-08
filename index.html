@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#12201C">
+<meta name="theme-color" content="#0B1730">
 <title>Nosotros</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/favicon-32.png">
@@ -18,26 +18,35 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <style>
   :root{
-    --bg:#12201C;
-    --surface:#1B2E28;
-    --surface-2:#223830;
-    --line:#2D453C;
-    --text:#F2F0E8;
-    --text-dim:#9FB3A9;
-    --a:#E8A33D;     /* persona A */
-    --a-dim:#3A3122;
-    --b:#D98C9A;     /* persona B */
-    --b-dim:#3A2A2D;
-    --shared:#6FB79A; /* compartido */
-    --shared-dim:#213A30;
+    --bg:#0B1730;
+    --surface:#122446;
+    --surface-2:#17305A;
+    --line:#274070;
+    --text:#F3F6FC;
+    --text-dim:#93A6CC;
+    --a:#F5A623;     /* persona A · dorado */
+    --a-dim:#3D2E13;
+    --b:#3FA6F2;     /* persona B · celeste */
+    --b-dim:#123049;
+    --shared:#29C2D6; /* compartido · turquesa */
+    --shared-dim:#0F3A42;
     --danger:#E2685A;
     --danger-dim:#3A2420;
+    --gold:#F5A623;
+    --peach:#FFC773;
+    --cyan:#4FD3E8;
+    --blue:#2F7FE0;
+    --navy:#0B1730;
     --radius:14px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
   body{
-    background:var(--bg);
+    background:
+      radial-gradient(circle at 15% -8%, rgba(245,166,35,.14), transparent 40%),
+      radial-gradient(circle at 100% 0%, rgba(63,166,242,.16), transparent 38%),
+      var(--bg);
+    background-attachment:fixed;
     color:var(--text);
     font-family:'Inter',sans-serif;
     -webkit-font-smoothing:antialiased;
@@ -269,11 +278,22 @@
   nav.tabbar svg{width:21px;height:21px;}
 
   .setup-wrap{
-    min-height:100vh;display:flex;flex-direction:column;justify-content:center;
-    padding:32px 26px;max-width:480px;margin:0 auto;
+    min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
+    padding:40px 30px;max-width:480px;margin:0 auto;position:relative;overflow:hidden;
+    background:
+      radial-gradient(circle at 18% 8%, rgba(255,199,115,.9), transparent 42%),
+      radial-gradient(circle at 88% 0%, rgba(79,211,232,.55), transparent 40%),
+      linear-gradient(165deg, #F5A623 0%, #E08A3E 22%, #2F7FE0 62%, #0B1730 100%);
   }
-  .setup-wrap h1{font-size:26px;line-height:1.25;margin:0 0 8px;}
-  .setup-wrap p{color:var(--text-dim);margin:0 0 28px;font-size:14.5px;}
+  .setup-wrap .stack, .setup-wrap label{ position:relative; z-index:2; width:100%; }
+  .setup-wrap h1{font-size:26px;line-height:1.25;margin:18px 0 6px;color:#fff;position:relative;z-index:2;}
+  .setup-wrap p{color:rgba(255,255,255,.88);margin:0 0 28px;font-size:14.5px;position:relative;z-index:2;}
+  .brand-mark{width:84px;height:84px;border-radius:22px;position:relative;z-index:2;box-shadow:0 12px 30px rgba(0,0,0,.35);}
+  .tagline{color:rgba(255,255,255,.75);font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin:-18px 0 26px;position:relative;z-index:2;}
+  .setup-wave{position:absolute;bottom:-2px;left:0;width:100%;z-index:1;opacity:.9;}
+  .setup-wrap input{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
+  .setup-wrap input::placeholder{color:rgba(255,255,255,.6);}
+  .setup-wrap .owner-choice button{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.85);}
 
   .toast{
     position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
@@ -402,7 +422,9 @@ function render(){
 function setupScreen(){
   return `
   <div class="setup-wrap">
+    <img src="/icon-192.png" class="brand-mark" alt="" />
     <h1>Un espacio para los dos.</h1>
+    <div class="tagline">Juntos, siempre</div>
     <p>Objetivos, plata y compras, sincronizado entre tus celulares. Para empezar, ¿cómo se llaman?</p>
     <div class="stack">
       <label class="field">Tu nombre
@@ -413,7 +435,14 @@ function setupScreen(){
       </label>
       <button class="primary" id="startBtn" style="margin-top:8px;">Crear nuestro espacio</button>
     </div>
+    ${setupWaveSvg()}
   </div>`;
+}
+function setupWaveSvg(){
+  return `<svg class="setup-wave" viewBox="0 0 500 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0 40 C 80 10, 160 70, 250 40 C 340 10, 420 70, 500 40 L500 80 L0 80 Z" fill="rgba(11,23,48,0.55)"/>
+    <path d="M0 55 C 90 25, 170 80, 260 55 C 350 30, 430 80, 500 55 L500 80 L0 80 Z" fill="rgba(11,23,48,0.85)"/>
+  </svg>`;
 }
 function attachSetupEvents(){
   document.getElementById('startBtn').onclick = async ()=>{
@@ -430,12 +459,15 @@ function attachSetupEvents(){
 function whoScreen(){
   return `
   <div class="setup-wrap">
+    <img src="/icon-192.png" class="brand-mark" alt="" />
     <h1>Hola de nuevo.</h1>
+    <div class="tagline">Juntos, siempre</div>
     <p>¿Quién sos vos en este celular?</p>
     <div class="stack">
       <button class="owner-choice sel-a" id="pickA" style="padding:16px;font-size:15px;">${state.settings.nameA}</button>
       <button class="owner-choice sel-b" id="pickB" style="padding:16px;font-size:15px;">${state.settings.nameB}</button>
     </div>
+    ${setupWaveSvg()}
   </div>`;
 }
 function attachWhoEvents(){
