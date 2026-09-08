@@ -345,23 +345,30 @@ let state = {
   goals: [],
   plans: [],
   budget: {monthlyLimit:0, transactions:[]},
+  savings: {goal:0, contributions:[]},
   shopping: [],
-  dates: []
+  dates: [],
+  pet: {name:'Prisca', logs:[]},
+  menu: {entries:[]}
 };
 let whoami = null;         // 'A' | 'B'
 let tab = 'home';
 let lastSnapshot = '';
+const WHOAMI_KEY = 'nosotros_whoami';
 
 async function loadAll(){
-  const [settings, goals, plans, budget, shopping, dates] = await Promise.all([
-    sget('settings'), sget('goals'), sget('plans'), sget('budget'), sget('shopping'), sget('dates')
+  const [settings, goals, plans, budget, savings, shopping, dates, pet, menu] = await Promise.all([
+    sget('settings'), sget('goals'), sget('plans'), sget('budget'), sget('savings'), sget('shopping'), sget('dates'), sget('pet'), sget('menu')
   ]);
   state.settings = settings;
   state.goals = goals || [];
   state.plans = plans || [];
   state.budget = budget || {monthlyLimit:0, transactions:[]};
+  state.savings = savings || {goal:0, contributions:[]};
   state.shopping = shopping || [];
   state.dates = dates || [];
+  state.pet = pet || {name:'Prisca', logs:[]};
+  state.menu = menu || {entries:[]};
 }
 
 function ownerName(owner){
@@ -432,8 +439,8 @@ function whoScreen(){
   </div>`;
 }
 function attachWhoEvents(){
-  document.getElementById('pickA').onclick = ()=>{ whoami='A'; render(); };
-  document.getElementById('pickB').onclick = ()=>{ whoami='B'; render(); };
+  document.getElementById('pickA').onclick = ()=>{ whoami='A'; localStorage.setItem(WHOAMI_KEY,'A'); render(); };
+  document.getElementById('pickB').onclick = ()=>{ whoami='B'; localStorage.setItem(WHOAMI_KEY,'B'); render(); };
 }
 
 /* ============ header + tabbar + fab ============ */
@@ -441,15 +448,17 @@ function headerHtml(){
   return `
   <header>
     <div class="brand">${state.settings.nameA} <span>&</span> ${state.settings.nameB}</div>
-    <div class="who-pill">
-      <button data-who="A" class="${whoami==='A'?'active-a':''}">${state.settings.nameA}</button>
-      <button data-who="B" class="${whoami==='B'?'active-b':''}">${state.settings.nameB}</button>
+    <div class="row" style="gap:8px;">
+      <div class="who-pill">
+        <button data-who="A" class="${whoami==='A'?'active-a':''}">${state.settings.nameA}</button>
+        <button data-who="B" class="${whoami==='B'?'active-b':''}">${state.settings.nameB}</button>
+      </div>
     </div>
   </header>`;
 }
 function attachChromeEvents(){
   document.querySelectorAll('[data-who]').forEach(b=>{
-    b.onclick = ()=>{ whoami = b.dataset.who; render(); };
+    b.onclick = ()=>{ whoami = b.dataset.who; localStorage.setItem(WHOAMI_KEY, whoami); render(); };
   });
 }
 
@@ -457,6 +466,7 @@ const TABS = [
   {id:'home', label:'Inicio', icon:'<path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/>'},
   {id:'goals', label:'Objetivos', icon:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>'},
   {id:'plans', label:'Planes', icon:'<path d="M9 3h6l1 4H8z"/><path d="M12 7v5"/><path d="M8 21c0-4 1.8-6 4-6s4 2 4 6"/>'},
+  {id:'pet', label:'Prisca', icon:'<circle cx="8" cy="7" r="1.6"/><circle cx="12.5" cy="5.5" r="1.6"/><circle cx="17" cy="7" r="1.6"/><circle cx="19" cy="11" r="1.6"/><path d="M12.5 12c-3 0-5.5 2.2-5.5 4.8 0 1.9 1.6 3.2 3.4 2.6.8-.3 1.4-.3 2.1 0 1.8.6 3.4-.7 3.4-2.6 0-2.6-2.4-4.8-5.4-4.8Z"/>'},
   {id:'budget', label:'Presupuesto', icon:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h.01"/>'},
   {id:'shopping', label:'Compras', icon:'<path d="M6 8h13l-1.5 9h-10z"/><path d="M6 8 5 4H3"/><circle cx="9.5" cy="20" r="1"/><circle cx="16.5" cy="20" r="1"/>'},
   {id:'dates', label:'Calendario', icon:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4"/><path d="M16 3v4"/><path d="M3 10h18"/>'}
@@ -471,7 +481,8 @@ function tabbarHtml(){
   </nav>`;
 }
 function fabHtml(){
-  if(tab==='home') return '';
+  if(tab==='home' || tab==='pet') return '';
+  if(tab==='shopping' && shoppingView==='menu') return '';
   return `<button class="fab" id="fabBtn">+</button>`;
 }
 function attachTabEvents(){
@@ -479,7 +490,10 @@ function attachTabEvents(){
     b.onclick = ()=>{ tab=b.dataset.tab; render(); };
   });
   const fab = document.getElementById('fabBtn');
-  if(fab) fab.onclick = ()=>openSheetFor(tab);
+  if(fab) fab.onclick = ()=>{
+    if(tab==='budget' && budgetView==='ahorro') openSavingSheet();
+    else openSheetFor(tab);
+  };
 }
 
 /* ============ tab content router ============ */
@@ -487,6 +501,7 @@ function tabContent(){
   if(tab==='home') return homeTab();
   if(tab==='goals') return goalsTab();
   if(tab==='plans') return plansTab();
+  if(tab==='pet') return petTab();
   if(tab==='budget') return budgetTab();
   if(tab==='shopping') return shoppingTab();
   if(tab==='dates') return datesTab();
@@ -534,6 +549,24 @@ function homeTab(){
       <div class="item-title">${escapeHtml(matchedPlans[0].title)}</div>
       ${matchedPlans.length>1 ? `<div class="item-sub">y ${matchedPlans.length-1} plan${matchedPlans.length>2?'es':''} más en el que coinciden</div>` : ''}
     </div>` : ''}
+    <div class="card" style="margin-bottom:16px;">
+      <div class="small muted" style="margin-bottom:10px;">Menú de hoy</div>
+      <div class="stack" style="gap:8px;">
+        ${MEALS.map(m=>{
+          const entry = menuEntryFor(toKey(new Date()), m.key);
+          return `<div class="row between small"><span class="muted">${m.label}</span><span>${entry ? escapeHtml(entry.dish)+' · '+(entry.cook==='shared'?'los dos':ownerName(entry.cook)) : 'sin definir'}</span></div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:16px;">
+      <div class="small muted" style="margin-bottom:10px;">${escapeHtml(state.pet.name)}</div>
+      <div class="stack" style="gap:8px;">
+        ${Object.entries(PET_TYPES).map(([key,cfg])=>{
+          const last = lastLogOf(key);
+          return `<div class="row between small"><span class="muted">${cfg.label}</span><span>${last ? timeAgo(last.at)+' · '+ownerName(last.owner) : 'sin registrar'}</span></div>`;
+        }).join('')}
+      </div>
+    </div>
     <div class="card">
       <div class="small muted" style="margin-bottom:8px;">Lo próximo en el calendario</div>
       ${upcoming ? `<div class="item-title">${upcoming.title}</div><div class="item-sub">${fmtDate(upcoming.next)}</div>` : `<div class="small muted">No hay nada agendado todavía.</div>`}
@@ -635,7 +668,101 @@ function plansTab(){
     </div>
   `;
 }
+let budgetView = 'gastos';
+/* ============ PET ============ */
+const PET_TYPES = {
+  comida: {label:'Comida', verb:'Le dio de comer', icon:'<path d="M12 3c-1.5 2-2 3.5-2 5a2 2 0 0 0 4 0c0-1.5-.5-3-2-5Z"/><path d="M7 10c1 0 2 .5 2.5 1.5" /><path d="M17 10c-1 0-2 .5-2.5 1.5"/><path d="M5 21c0-4 3-7 7-7s7 3 7 7"/>'},
+  paseo: {label:'Paseo', verb:'La paseó', icon:'<circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="18" r="2.2"/><path d="M8 18h8"/><path d="M9 18l3-9 3 9"/><path d="M12 9V5"/>'},
+  bano: {label:'Salida al baño', verb:'La sacó', icon:'<path d="M12 4c-2 2.5-4 5-4 7.5a4 4 0 0 0 8 0C16 9 14 6.5 12 4Z"/><path d="M7 20h10"/>'}
+};
+
+function timeAgo(iso){
+  if(!iso) return null;
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const mins = Math.round(diffMs/60000);
+  if(mins < 1) return 'recién';
+  if(mins < 60) return 'hace '+mins+' min';
+  const hrs = Math.round(mins/60);
+  if(hrs < 24) return 'hace '+hrs+'h';
+  const days = Math.round(hrs/24);
+  return 'hace '+days+'d';
+}
+function lastLogOf(type){
+  const logs = state.pet.logs.filter(l=>l.type===type).sort((a,b)=>new Date(b.at)-new Date(a.at));
+  return logs[0] || null;
+}
+function isToday(iso){
+  const d = new Date(iso), t = new Date();
+  return d.toDateString()===t.toDateString();
+}
+
+async function quickLog(type){
+  state.pet.logs.push({id:uid(), type, at:new Date().toISOString(), owner:whoami});
+  await sset('pet', state.pet);
+  render();
+  showToast('Anotado');
+}
+
+function petTab(){
+  const todayLogs = state.pet.logs.filter(l=>isToday(l.at)).sort((a,b)=>new Date(b.at)-new Date(a.at));
+  const recentLogs = state.pet.logs.slice().sort((a,b)=>new Date(b.at)-new Date(a.at)).slice(0,20);
+
+  return `
+    <div class="section-title">${escapeHtml(state.pet.name)}</div>
+    <div class="stack" style="margin-bottom:16px;">
+      ${Object.entries(PET_TYPES).map(([key,cfg])=>{
+        const last = lastLogOf(key);
+        return `
+        <button data-pet-quick="${key}" class="card" style="display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:none;cursor:pointer;">
+          <div style="width:40px;height:40px;border-radius:50%;background:var(--shared-dim);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--shared)" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${cfg.icon}</svg>
+          </div>
+          <div style="flex:1;">
+            <div class="item-title">${cfg.label}</div>
+            <div class="item-sub">${last ? `Último: ${timeAgo(last.at)} · ${ownerName(last.owner)}` : 'Todavía no hay registros'}</div>
+          </div>
+          <span class="tag shared">Anotar</span>
+        </button>`;
+      }).join('')}
+    </div>
+
+    <div class="card" style="margin-bottom:16px;">
+      <div class="small muted" style="margin-bottom:10px;">Hoy</div>
+      <div class="metric-grid" style="grid-template-columns:repeat(3,1fr);">
+        ${Object.entries(PET_TYPES).map(([key,cfg])=>`
+          <div class="metric">
+            <div class="label">${cfg.label}</div>
+            <div class="value">${todayLogs.filter(l=>l.type===key).length}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="small muted" style="margin-bottom:8px;">Historial</div>
+      ${recentLogs.length ? recentLogs.map(l=>`
+        <div class="list-item">
+          <div style="flex:1;">
+            <div class="item-title">${PET_TYPES[l.type].verb}</div>
+            <div class="item-sub">${fmtDate(l.at)} · ${new Date(l.at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})} · ${ownerName(l.owner)}</div>
+          </div>
+          <button data-del-pet-log="${l.id}" class="ghost" style="padding:6px 9px;">Quitar</button>
+        </div>
+      `).join('') : emptyState('Sin registros todavía', 'Tocá alguno de los botones de arriba.')}
+    </div>
+  `;
+}
 function budgetTab(){
+  return `
+    <div class="section-title">Presupuesto</div>
+    <div class="row" style="gap:8px;margin-bottom:16px;">
+      <button class="ghost" data-budget-view="gastos" style="${budgetView==='gastos'?'background:var(--shared-dim);color:var(--shared);border-color:var(--shared);':''}">Gastos del mes</button>
+      <button class="ghost" data-budget-view="ahorro" style="${budgetView==='ahorro'?'background:var(--shared-dim);color:var(--shared);border-color:var(--shared);':''}">Ahorro</button>
+    </div>
+    ${budgetView==='gastos' ? gastosView() : ahorroView()}
+  `;
+}
+function gastosView(){
   const tx = currentMonthTx().slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
   const spent = tx.filter(t=>t.type==='gasto').reduce((s,t)=>s+Number(t.amount),0);
   const income = tx.filter(t=>t.type==='ingreso').reduce((s,t)=>s+Number(t.amount),0);
@@ -648,7 +775,6 @@ function budgetTab(){
   const maxCat = catEntries.length ? catEntries[0][1] : 1;
 
   return `
-    <div class="section-title">Presupuesto del mes</div>
     <div class="card" style="margin-bottom:16px;">
       <div class="row between">
         <span class="small muted">Límite mensual</span>
@@ -692,13 +818,72 @@ function budgetTab(){
     </div>
   `;
 }
+function ahorroView(){
+  const goal = Number(state.savings.goal)||0;
+  const contributions = state.savings.contributions.slice().sort((a,b)=>new Date(b.date)-new Date(a.date));
+  const total = contributions.reduce((s,c)=>s+Number(c.amount),0);
+  const totalA = contributions.filter(c=>c.owner==='A').reduce((s,c)=>s+Number(c.amount),0);
+  const totalB = contributions.filter(c=>c.owner==='B').reduce((s,c)=>s+Number(c.amount),0);
+  const pct = goal>0 ? Math.min(100, Math.round(total/goal*100)) : 0;
+
+  return `
+    <div class="card" style="margin-bottom:16px;">
+      <div class="row between">
+        <span class="small muted">Meta de ahorro</span>
+        <button class="ghost" id="editGoalBtn" style="padding:5px 10px;">Editar</button>
+      </div>
+      <div class="row between" style="margin:10px 0 8px;">
+        <span style="font-size:22px;font-weight:600;">${fmt(total)}</span>
+        <span class="small muted">${goal>0 ? 'de '+fmt(goal) : 'sin meta definida'}</span>
+      </div>
+      ${goal>0 ? `<div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>` : ''}
+    </div>
+
+    <div class="metric-grid">
+      <div class="metric">
+        <div class="label">Aportó ${state.settings.nameA}</div>
+        <div class="value" style="color:var(--a);">${fmt(totalA)}</div>
+      </div>
+      <div class="metric">
+        <div class="label">Aportó ${state.settings.nameB}</div>
+        <div class="value" style="color:var(--b);">${fmt(totalB)}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="small muted" style="margin-bottom:8px;">Aportes</div>
+      ${contributions.length ? contributions.map(c=>`
+        <div class="list-item">
+          <div style="flex:1;">
+            <div class="item-title">${ownerName(c.owner)}${c.note ? ' · '+escapeHtml(c.note) : ''}</div>
+            <div class="item-sub">${fmtDate(c.date)}</div>
+          </div>
+          <div class="row" style="gap:8px;">
+            <span style="font-weight:600;color:var(--shared);">+${fmt(c.amount)}</span>
+            <button data-del-saving="${c.id}" class="ghost" style="padding:4px 8px;">Quitar</button>
+          </div>
+        </div>
+      `).join('') : emptyState('Sin aportes todavía', 'Sumá el primero con el +.')}
+    </div>
+  `;
+}
 
 /* ============ SHOPPING ============ */
+let shoppingView = 'lista';
 function shoppingTab(){
+  return `
+    <div class="section-title">Compras</div>
+    <div class="row" style="gap:8px;margin-bottom:16px;">
+      <button class="ghost" data-shopping-view="lista" style="${shoppingView==='lista'?'background:var(--shared-dim);color:var(--shared);border-color:var(--shared);':''}">Lista</button>
+      <button class="ghost" data-shopping-view="menu" style="${shoppingView==='menu'?'background:var(--shared-dim);color:var(--shared);border-color:var(--shared);':''}">Menú de la semana</button>
+    </div>
+    ${shoppingView==='lista' ? listaView() : menuView()}
+  `;
+}
+function listaView(){
   const pending = state.shopping.filter(i=>!i.done);
   const done = state.shopping.filter(i=>i.done);
   return `
-    <div class="section-title">Lista de compras</div>
     <div class="card" style="margin-bottom:16px;">
       ${pending.length ? pending.map(i=>shoppingRow(i)).join('') : emptyState('Nada pendiente', 'Buen momento para respirar. Sumá algo con el +.')}
     </div>
@@ -723,6 +908,50 @@ function shoppingRow(i){
       </div>
       <button data-del-shop="${i.id}" class="ghost" style="padding:6px 9px;">Quitar</button>
     </div>`;
+}
+
+/* ============ MENU SEMANAL ============ */
+const MEALS = [{key:'almuerzo', label:'Almuerzo'}, {key:'cena', label:'Cena'}];
+const WEEKDAY_LONG = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+
+function nextDays(n){
+  const out = [];
+  const base = new Date(); base.setHours(0,0,0,0);
+  for(let i=0;i<n;i++){ const d=new Date(base); d.setDate(base.getDate()+i); out.push(d); }
+  return out;
+}
+function menuEntryFor(dateKey, meal){
+  return state.menu.entries.find(e=>e.date===dateKey && e.meal===meal) || null;
+}
+function menuView(){
+  const days = nextDays(7);
+  return `
+    <div class="card">
+      ${days.map(d=>{
+        const key = toKey(d);
+        const isToday = key===toKey(new Date());
+        return `
+        <div style="padding:12px 0;border-bottom:1px solid var(--line);">
+          <div class="small" style="font-weight:600;margin-bottom:8px;text-transform:capitalize;color:${isToday?'var(--shared)':'var(--text)'};">
+            ${isToday ? 'Hoy' : WEEKDAY_LONG[d.getDay()]} ${d.getDate()} ${isToday?'':''}
+          </div>
+          <div class="stack" style="gap:6px;">
+            ${MEALS.map(m=>{
+              const entry = menuEntryFor(key, m.key);
+              return `
+              <button data-menu-slot="${key}|${m.key}" class="row between" style="width:100%;text-align:left;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;">
+                <span class="small muted" style="min-width:64px;">${m.label}</span>
+                ${entry ? `
+                  <span class="small" style="flex:1;padding:0 8px;">${escapeHtml(entry.dish)}</span>
+                  <span class="tag ${ownerTagClass(entry.cook)}">${entry.cook==='shared'?'Los dos':ownerName(entry.cook)}</span>
+                ` : `<span class="small muted" style="flex:1;padding:0 8px;">Sin definir</span>`}
+              </button>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
 }
 
 /* ============ CALENDAR ============ */
@@ -930,6 +1159,101 @@ function openTxSheet(){
 }
 function openEditLimit(){ openTxSheet(); }
 
+function openSavingSheet(){
+  openSheet(`
+    <h3>Nuevo aporte</h3>
+    <div class="stack">
+      <label class="field">¿Quién aporta?
+        <div class="owner-choice" id="svOwner">
+          <button data-val="A" class="sel-a">${state.settings.nameA}</button>
+          <button data-val="B" class="sel-b">${state.settings.nameB}</button>
+        </div>
+      </label>
+      <label class="field">Monto<input id="svAmount" type="number" placeholder="0" inputmode="decimal" /></label>
+      <label class="field">Nota (opcional)<input id="svNote" placeholder="Ej: aporte de septiembre" /></label>
+      <label class="field">Fecha<input id="svDate" type="date" /></label>
+      <button class="primary" id="saveSaving">Guardar aporte</button>
+    </div>
+  `, ()=>{
+    let owner = whoami;
+    const buttons = document.querySelectorAll('#svOwner button');
+    const markSel=()=>buttons.forEach(b=>b.style.opacity = b.dataset.val===owner?1:.55);
+    markSel();
+    buttons.forEach(b=>b.onclick=()=>{ owner=b.dataset.val; markSel(); });
+    document.getElementById('svDate').value = new Date().toISOString().slice(0,10);
+
+    document.getElementById('saveSaving').onclick = async ()=>{
+      const amount = Number(document.getElementById('svAmount').value);
+      if(!amount){ showToast('Poné un monto'); return; }
+      state.savings.contributions.push({
+        id:uid(), amount, owner,
+        note:document.getElementById('svNote').value.trim(),
+        date:document.getElementById('svDate').value || new Date().toISOString().slice(0,10)
+      });
+      await sset('savings', state.savings);
+      closeSheet(); render();
+    };
+  });
+}
+
+function openGoalSheet_savings(){
+  openSheet(`
+    <h3>Meta de ahorro</h3>
+    <div class="stack">
+      <label class="field">¿Cuánto quieren juntar?<input id="svGoal" type="number" value="${state.savings.goal||''}" placeholder="Ej: 1000000" /></label>
+      <button class="primary" id="saveSavingGoal">Guardar meta</button>
+    </div>
+  `, ()=>{
+    document.getElementById('saveSavingGoal').onclick = async ()=>{
+      state.savings.goal = Number(document.getElementById('svGoal').value)||0;
+      await sset('savings', state.savings);
+      closeSheet(); render();
+    };
+  });
+}
+
+function openMenuSheet(dateKey, meal){
+  const existing = menuEntryFor(dateKey, meal);
+  const d = new Date(dateKey);
+  const mealLabel = MEALS.find(m=>m.key===meal).label;
+  openSheet(`
+    <h3>${mealLabel} · ${WEEKDAY_LONG[d.getDay()]} ${d.getDate()}</h3>
+    <div class="stack">
+      <label class="field">¿Qué van a comer?<input id="mnDish" placeholder="Ej: Milanesas con puré" value="${existing?escapeHtml(existing.dish):''}" /></label>
+      <label class="field">¿Quién cocina?
+        <div class="owner-choice" id="mnCook">
+          <button data-val="A" class="sel-a">${state.settings.nameA}</button>
+          <button data-val="B" class="sel-b">${state.settings.nameB}</button>
+          <button data-val="shared" class="sel-shared">Los dos</button>
+        </div>
+      </label>
+      <button class="primary" id="saveMenu">Guardar</button>
+      ${existing ? `<button class="ghost" id="deleteMenu" style="width:100%;">Quitar esta comida</button>` : ''}
+    </div>
+  `, ()=>{
+    let cook = existing ? existing.cook : whoami;
+    const buttons = document.querySelectorAll('#mnCook button');
+    const markSel=()=>buttons.forEach(b=>b.style.opacity = b.dataset.val===cook?1:.55);
+    markSel();
+    buttons.forEach(b=>b.onclick=()=>{ cook=b.dataset.val; markSel(); });
+
+    document.getElementById('saveMenu').onclick = async ()=>{
+      const dish = document.getElementById('mnDish').value.trim();
+      if(!dish){ showToast('Escribí qué van a comer'); return; }
+      state.menu.entries = state.menu.entries.filter(e=>!(e.date===dateKey && e.meal===meal));
+      state.menu.entries.push({id:uid(), date:dateKey, meal, dish, cook});
+      await sset('menu', state.menu);
+      closeSheet(); render();
+    };
+    const delBtn = document.getElementById('deleteMenu');
+    if(delBtn) delBtn.onclick = async ()=>{
+      state.menu.entries = state.menu.entries.filter(e=>!(e.date===dateKey && e.meal===meal));
+      await sset('menu', state.menu);
+      closeSheet(); render();
+    };
+  });
+}
+
 function openShopSheet(){
   openSheet(`
     <h3>Agregar a la lista</h3>
@@ -1036,6 +1360,30 @@ document.addEventListener('click', async (e)=>{
   if(filterBtn){ goalFilter = filterBtn.dataset.goalFilter; render(); return; }
   const editLimit = e.target.closest('#editLimitBtn');
   if(editLimit){ openEditLimit(); return; }
+  const budgetViewBtn = e.target.closest('[data-budget-view]');
+  if(budgetViewBtn){ budgetView = budgetViewBtn.dataset.budgetView; render(); return; }
+  const editGoal = e.target.closest('#editGoalBtn');
+  if(editGoal){ openGoalSheet_savings(); return; }
+  const delSaving = e.target.closest('[data-del-saving]')?.dataset.delSaving;
+  if(delSaving){
+    state.savings.contributions = state.savings.contributions.filter(x=>x.id!==delSaving);
+    await sset('savings', state.savings); render(); return;
+  }
+  const petQuick = e.target.closest('[data-pet-quick]')?.dataset.petQuick;
+  if(petQuick){ await quickLog(petQuick); return; }
+  const delPetLog = e.target.closest('[data-del-pet-log]')?.dataset.delPetLog;
+  if(delPetLog){
+    state.pet.logs = state.pet.logs.filter(x=>x.id!==delPetLog);
+    await sset('pet', state.pet); render(); return;
+  }
+  const shoppingViewBtn = e.target.closest('[data-shopping-view]');
+  if(shoppingViewBtn){ shoppingView = shoppingViewBtn.dataset.shoppingView; render(); return; }
+  const menuSlot = e.target.closest('[data-menu-slot]')?.dataset.menuSlot;
+  if(menuSlot){
+    const [dateKey, meal] = menuSlot.split('|');
+    openMenuSheet(dateKey, meal);
+    return;
+  }
 });
 
 /* ============ sync en tiempo real (Firestore) ============ */
@@ -1049,8 +1397,11 @@ function startRealtimeSync(){
     state.goals = data.goals || [];
     state.plans = data.plans || [];
     state.budget = data.budget || {monthlyLimit:0, transactions:[]};
+    state.savings = data.savings || {goal:0, contributions:[]};
     state.shopping = data.shopping || [];
     state.dates = data.dates || [];
+    state.pet = data.pet || {name:'Prisca', logs:[]};
+    state.menu = data.menu || {entries:[]};
     render();
   }, err=>{
     console.error('sync error', err);
@@ -1070,8 +1421,9 @@ function configScreen(){
 /* ============ boot ============ */
 (async function init(){
   if(!fbReady){ document.getElementById('root').innerHTML = configScreen(); return; }
+  try{ whoami = localStorage.getItem(WHOAMI_KEY) || null; }catch(e){ whoami = null; }
   await loadAll();
-  lastSnapshot = JSON.stringify({settings:state.settings, goals:state.goals, budget:state.budget, shopping:state.shopping, dates:state.dates});
+  lastSnapshot = JSON.stringify({settings:state.settings, goals:state.goals, plans:state.plans, budget:state.budget, savings:state.savings, shopping:state.shopping, dates:state.dates, pet:state.pet, menu:state.menu});
   render();
   startRealtimeSync();
 })();
