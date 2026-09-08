@@ -67,10 +67,9 @@
     padding:20px 20px 14px;
     display:flex;
     align-items:center;
-    justify-content:space-between;
-    gap:12px;
+    gap:10px;
   }
-  header .brand{font-size:20px;font-weight:600;letter-spacing:-0.02em;}
+  header .brand{font-size:19px;font-weight:600;letter-spacing:-0.02em;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   header .brand span{color:var(--shared);}
   .who-pill{
     display:flex;
@@ -281,19 +280,25 @@
     min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;
     padding:40px 30px;max-width:480px;margin:0 auto;position:relative;overflow:hidden;
     background:
-      radial-gradient(circle at 18% 8%, rgba(255,199,115,.9), transparent 42%),
-      radial-gradient(circle at 88% 0%, rgba(79,211,232,.55), transparent 40%),
-      linear-gradient(165deg, #F5A623 0%, #E08A3E 22%, #2F7FE0 62%, #0B1730 100%);
+      radial-gradient(circle at 18% 8%, rgba(255,199,115,.85), transparent 42%),
+      radial-gradient(circle at 88% 4%, rgba(79,211,232,.5), transparent 42%),
+      linear-gradient(165deg, #FFC773 0%, #F5A623 16%, #E8789A 38%, #7C8FE8 58%, #2F7FE0 76%, #0B1730 100%);
   }
   .setup-wrap .stack, .setup-wrap label{ position:relative; z-index:2; width:100%; }
-  .setup-wrap h1{font-size:26px;line-height:1.25;margin:18px 0 6px;color:#fff;position:relative;z-index:2;}
+  .setup-wrap h1{font-size:26px;line-height:1.25;margin:18px 0 4px;color:#fff;position:relative;z-index:2;}
   .setup-wrap p{color:rgba(255,255,255,.88);margin:0 0 28px;font-size:14.5px;position:relative;z-index:2;}
   .brand-mark{width:84px;height:84px;border-radius:22px;position:relative;z-index:2;box-shadow:0 12px 30px rgba(0,0,0,.35);}
-  .tagline{color:rgba(255,255,255,.75);font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin:-18px 0 26px;position:relative;z-index:2;}
+  .tagline{color:rgba(255,255,255,.75);font-size:12px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 24px;position:relative;z-index:2;}
   .setup-wave{position:absolute;bottom:-2px;left:0;width:100%;z-index:1;opacity:.9;}
   .setup-wrap input{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.3);color:#fff;}
   .setup-wrap input::placeholder{color:rgba(255,255,255,.6);}
-  .setup-wrap .owner-choice button{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.85);}
+  .pick-btn{
+    width:100%;display:block;border-radius:12px;padding:16px;font-family:'Inter',sans-serif;
+    font-weight:600;font-size:15px;cursor:pointer;border:1px solid rgba(255,255,255,.35);
+    background:rgba(255,255,255,.12);color:#fff;
+  }
+  .pick-btn.pick-a{border-color:rgba(255,214,140,.9);color:#FFE1A8;background:rgba(255,183,77,.18);}
+  .pick-btn.pick-b{border-color:rgba(159,212,255,.9);color:#BFE3FF;background:rgba(63,166,242,.22);}
 
   .toast{
     position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
@@ -464,8 +469,8 @@ function whoScreen(){
     <div class="tagline">Juntos, siempre</div>
     <p>¿Quién sos vos en este celular?</p>
     <div class="stack">
-      <button class="owner-choice sel-a" id="pickA" style="padding:16px;font-size:15px;">${state.settings.nameA}</button>
-      <button class="owner-choice sel-b" id="pickB" style="padding:16px;font-size:15px;">${state.settings.nameB}</button>
+      <button class="pick-btn pick-a" id="pickA" style="padding:16px;font-size:15px;">${state.settings.nameA}</button>
+      <button class="pick-btn pick-b" id="pickB" style="padding:16px;font-size:15px;">${state.settings.nameB}</button>
     </div>
     ${setupWaveSvg()}
   </div>`;
@@ -479,12 +484,13 @@ function attachWhoEvents(){
 function headerHtml(){
   return `
   <header>
+    <button id="homeBtn" aria-label="Ir a Inicio" style="background:var(--surface);border:1px solid var(--line);border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:${tab==='home'?'var(--shared)':'var(--text-dim)'};">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9"/></svg>
+    </button>
     <div class="brand">${state.settings.nameA} <span>&</span> ${state.settings.nameB}</div>
-    <div class="row" style="gap:8px;">
-      <div class="who-pill">
-        <button data-who="A" class="${whoami==='A'?'active-a':''}">${state.settings.nameA}</button>
-        <button data-who="B" class="${whoami==='B'?'active-b':''}">${state.settings.nameB}</button>
-      </div>
+    <div class="who-pill">
+      <button data-who="A" class="${whoami==='A'?'active-a':''}">${state.settings.nameA}</button>
+      <button data-who="B" class="${whoami==='B'?'active-b':''}">${state.settings.nameB}</button>
     </div>
   </header>`;
 }
@@ -492,6 +498,8 @@ function attachChromeEvents(){
   document.querySelectorAll('[data-who]').forEach(b=>{
     b.onclick = ()=>{ whoami = b.dataset.who; localStorage.setItem(WHOAMI_KEY, whoami); render(); };
   });
+  const homeBtn = document.getElementById('homeBtn');
+  if(homeBtn) homeBtn.onclick = ()=>{ tab='home'; render(); };
 }
 
 const TABS = [
@@ -541,6 +549,64 @@ function tabContent(){
 }
 
 /* ============ HOME ============ */
+const PHRASES = [
+  "❤️ Juntos somos más fuertes que cualquier dificultad.",
+  "No importa el camino, mientras lo recorramos juntos.",
+  "Tu sueño también es mi sueño, y voy a ayudarte a alcanzarlo.",
+  "El amor verdadero no solo acompaña, también impulsa.",
+  "Juntos podemos construir la vida que soñamos.",
+  "Cuando uno cae, el otro está para levantarlo.",
+  "No somos perfectos, pero somos perfectos para crecer juntos.",
+  "Nuestro mejor proyecto siempre será nosotros.",
+  "Que nunca nos falten ganas de elegirnos cada día.",
+  "Dos personas, un equipo, un mismo propósito.",
+  "Si la vida se pone difícil, nos ponemos más fuertes juntos.",
+  "Crecer juntos también es una forma de amarnos.",
+  "Donde haya amor, habrá fuerzas para seguir.",
+  "No quiero una vida perfecta, quiero una vida contigo.",
+  "Cada obstáculo nos da una razón más para abrazarnos.",
+  "Nuestro amor es el lugar al que siempre quiero volver.",
+  "Juntos, hasta nuestros días más difíciles tienen sentido.",
+  "No te prometo que será fácil; te prometo que no estarás solo/a.",
+  "Somos compañeros de vida, no competidores.",
+  "Tu mano en la mía y podemos con todo.",
+  "Que nuestros sueños siempre tengan un lugar para los dos.",
+  "Amar también es creer en el otro cuando el otro duda de sí mismo.",
+  "Quiero verte cumplir tus sueños y estar a tu lado para celebrarlos.",
+  "El éxito sabe mejor cuando tenemos con quién compartirlo.",
+  "No importa cuánto tardemos, mientras sigamos avanzando juntos.",
+  "Nuestro amor no nos limita; nos da alas.",
+  "Cuando estamos juntos, cada desafío parece un poco más pequeño.",
+  "Siempre habrá una razón para seguir luchando por nosotros.",
+  "Que nunca dejemos de crecer, aprender y soñar juntos.",
+  "Somos dos historias que decidieron escribir una sola.",
+  "El futuro da menos miedo cuando lo construimos juntos.",
+  "Contigo quiero ganar, perder, aprender y volver a intentarlo.",
+  "Nuestro hogar no es un lugar; es donde estamos juntos.",
+  "Amarte es también apostar por nuestro futuro.",
+  "Que nuestros problemas sean temporales y nuestro amor permanente.",
+  "Juntos no necesitamos tener todas las respuestas, solo seguir caminando.",
+  "Si tú crees en mí, yo creeré en nosotros.",
+  "Un equipo de verdad se sostiene incluso en los días difíciles.",
+  "No quiero ser mejor que tú; quiero ser mejor contigo.",
+  "Cada día contigo es una oportunidad para construir algo más grande.",
+  "Nuestros sueños pueden ser grandes porque somos dos para perseguirlos.",
+  "Cuando uno pierde fuerzas, el otro presta las suyas.",
+  "El amor también es decir: \"Yo estoy contigo, incluso en esto\".",
+  "Que nunca olvidemos todo lo que hemos superado juntos.",
+  "Nuestro pasado nos hizo fuertes; nuestro futuro nos espera.",
+  "No sabemos qué traerá mañana, pero sabemos quién estará a nuestro lado.",
+  "Juntos podemos convertir los sueños en planes y los planes en realidad.",
+  "Elegirte cada día es mi forma favorita de construir un futuro.",
+  "Que nuestro amor sea siempre refugio, fuerza y motivación.",
+  "🫶 Tú y yo contra el mundo, pero siempre del mismo lado."
+];
+function phraseOfTheDay(){
+  const start = new Date(new Date().getFullYear(),0,0);
+  const diff = new Date() - start;
+  const dayOfYear = Math.floor(diff / 86400000);
+  return PHRASES[dayOfYear % PHRASES.length];
+}
 function monthKey(d){ const dt=new Date(d); return dt.getFullYear()+'-'+dt.getMonth(); }
 function currentMonthTx(){
   const now = monthKey(new Date());
@@ -558,6 +624,9 @@ function homeTab(){
 
   return `
     <div class="section-title">Hola, ${ownerName(whoami)}</div>
+    <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg, var(--a-dim), var(--b-dim));border-color:var(--line);">
+      <div class="small" style="line-height:1.6;font-style:italic;">${phraseOfTheDay()}</div>
+    </div>
     <div class="metric-grid">
       <div class="metric">
         <div class="label">Objetivos activos</div>
